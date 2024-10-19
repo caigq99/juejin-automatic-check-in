@@ -33,8 +33,8 @@ struct SuccessData {
 #[tokio::main]
 async fn main() {
     // 定义环境变量文件路径
-    // let env_path = dirs::home_dir().unwrap().join(".env");
-    let env_path = PathBuf::new().join(".env");
+    let env_path = dirs::home_dir().unwrap().join(".env");
+    // let env_path = PathBuf::new().join(".env");
     // 判断环境变量文件是否存在
     if !env_file_exist(&env_path) {
         return;
