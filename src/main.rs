@@ -1,4 +1,4 @@
-use chrono::TimeZone;
+use chrono_tz::Asia::Shanghai;
 use reqwest::{header, Client};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, path::PathBuf, process};
@@ -20,8 +20,14 @@ const ROOT_URL: &str = "https://juejin.cn";
 #[derive(Debug, Serialize, Deserialize)]
 struct ResponseData {
     err_msg: String,
-    data: Option<()>,
+    data: Option<SuccessData>,
     err_no: u32,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct SuccessData {
+    incr_point: u32,
+    sum_point: u32,
 }
 
 #[tokio::main]
@@ -40,14 +46,12 @@ async fn main() {
     let schedule = JobScheduler::new().await.unwrap();
 
     // 定时任务1： 每天 21：45 执行
-    let check_in_job = Job::new_async("0 56 21 * * * *", |_uuid, _lock| {
+    let check_in_job = Job::new_async_tz("1/4 * * * * * ", Shanghai, |_uuid, _lock| {
         Box::pin(async {
             eprintln!(
                 "开始自动签到： {}",
                 chrono::offset::Local::now().format("%Y-%m-%d %H:%M:%S")
             );
-
-            // chrono::TimeZone::from_offset(chrono::Utc::offset_from_local_datetime(&self, local));
             if let Err(e) = auto_check_in().await {
                 eprintln!("自动签到失败: {:?}, 请自行手动签到", e);
             } else {
@@ -60,7 +64,7 @@ async fn main() {
     })
     .unwrap();
     // 定时任务2： 每隔一个月发送邮件提醒更换session
-    // let send_email_job = Job::new_async("1/10 * * * * *", |_uuid, _lock| {
+    // let send_email_job = Job::new_async_tz("1/10 * * * * *", Shanghai,|_uuid, _lock| {
     //     Box::pin(async move {
     //         eprintln!(
     //             "开始自动发送邮件： {}",
@@ -158,6 +162,7 @@ async fn auto_check_in() -> reqwest::Result<()> {
     let mut params = HashMap::new();
     params.insert("uuid", dotenv::var("UUID").unwrap());
     params.insert("aid", dotenv::var("AID").unwrap());
+    params.insert("spider", 0.to_string());
     let response = client
         .post(CHECK_IN_URL)
         .headers(headers)
@@ -170,6 +175,7 @@ async fn auto_check_in() -> reqwest::Result<()> {
     // 打印响应内容
     let body: ResponseData = response.json().await?;
     eprintln!("请求状态: {:#?}, 响应内容: {:?}", status, body);
+
     Ok(())
 }
 
