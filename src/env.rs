@@ -1,4 +1,4 @@
-use crate::{ENV_NOT_VALID_FIELDS, ENV_VALID_FIELDS};
+use crate::config::{ENV_NOT_VALID_FIELDS, ENV_VALID_FIELDS};
 use anyhow::Result;
 use dotenv;
 use std::path::PathBuf;
@@ -17,6 +17,7 @@ pub fn valid_env() -> Result<()> {
     for field in ENV_VALID_FIELDS {
         match dotenv::var(field) {
             Ok(value) => {
+                println!("{}: {}", field, value);
                 if value.trim().is_empty() {
                     return Err(anyhow::anyhow!("字段 {} 不能为空 ", field));
                 } else {
@@ -41,6 +42,7 @@ pub fn valid_env() -> Result<()> {
             }
         }
     }
+
     Ok(())
 }
 
