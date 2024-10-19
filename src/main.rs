@@ -4,7 +4,7 @@ use chrono_tz::Asia::Shanghai;
 use env::{env_file_exist, load_env, valid_env};
 use reqwest::{header, Client};
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, path::PathBuf, process};
+use std::collections::HashMap;
 use tokio::time::{sleep, Duration};
 use tokio_cron_scheduler::{Job, JobScheduler};
 
