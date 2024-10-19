@@ -45,8 +45,8 @@ async fn main() {
     // 初始化调度器
     let schedule = JobScheduler::new().await.unwrap();
 
-    // 定时任务1： 每天 21：45 执行
-    let check_in_job = Job::new_async_tz("1/4 * * * * * ", Shanghai, |_uuid, _lock| {
+    // 定时任务1： 每天 早上八点 执行自动签到
+    let check_in_job = Job::new_async_tz("* * 8 * * * ", Shanghai, |_uuid, _lock| {
         Box::pin(async {
             eprintln!(
                 "开始自动签到： {}",
