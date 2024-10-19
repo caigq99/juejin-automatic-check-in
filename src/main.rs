@@ -1,24 +1,16 @@
+mod config;
 mod env;
+
 use anyhow::Result;
 use chrono_tz::Asia::Shanghai;
-use env::{env_file_exist, load_env, valid_env};
 use reqwest::{header, Client};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tokio::time::{sleep, Duration};
 use tokio_cron_scheduler::{Job, JobScheduler};
 
-pub const ENV_VALID_FIELDS: [&str; 4] = ["COOKIE", "UUID", "AID", "SEND_EMAIL"];
-pub const ENV_NOT_VALID_FIELDS: [&str; 5] = [
-    "SMTP_USER",
-    "SMTP_PASS",
-    "SMTP_SERVER",
-    "SMTP_PORT",
-    "EMAIL_RECIPIENT",
-];
-
-const CHECK_IN_URL: &str = "https://api.juejin.cn/growth_api/v1/check_in";
-const ROOT_URL: &str = "https://juejin.cn";
+use config::{CHECK_IN_URL, DEFAULT_CHECK_IN_CRON_STR, DEFAULT_SEND_EMAIL_CRON_STR, ROOT_URL};
+use env::{env_file_exist, load_env, valid_env};
 
 #[derive(Debug, Serialize, Deserialize)]
 struct ResponseData {
@@ -35,6 +27,7 @@ struct SuccessData {
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    welcome();
     // 定义环境变量文件路径
     let env_path = dirs::home_dir().unwrap().join(".env");
 
@@ -54,7 +47,7 @@ async fn main() -> Result<()> {
     let schedule = JobScheduler::new().await?;
 
     // 定时任务1： 每天 早上八点 执行自动签到
-    let check_in_job = Job::new_async_tz("* * 8 * * * ", Shanghai, |_uuid, _lock| {
+    let check_in_job = Job::new_async_tz(get_check_in_cron_str(), Shanghai, |_uuid, _lock| {
         Box::pin(async {
             eprintln!(
                 "开始自动签到： {}",
@@ -71,7 +64,7 @@ async fn main() -> Result<()> {
         })
     })?;
     // 定时任务2： 每隔一个月发送邮件提醒更换session
-    // let send_email_job = Job::new_async_tz("1/10 * * * * *", Shanghai,|_uuid, _lock| {
+    // let send_email_job = Job::new_async_tz(get_send_email_cron_str(), Shanghai,|_uuid, _lock| {
     //     Box::pin(async move {
     //         eprintln!(
     //             "开始自动发送邮件： {}",
@@ -87,11 +80,55 @@ async fn main() -> Result<()> {
 
     // 启动调度器
     schedule.start().await?;
-
+    eprintln!("\n定时任务已启动，如需退出按Ctrl+C退出程序\n");
     // 保持程序运行
     loop {
         sleep(Duration::from_secs(60)).await;
     }
+}
+
+#[allow(dead_code)]
+fn welcome() {
+    eprintln!("欢迎使用掘金自动签到脚本 \n");
+    eprintln!("关于配置字段描述：");
+    // 字段描述
+    let fields_description: HashMap<&str, &str> = HashMap::from([
+        (
+            "COOKIE",
+            "掘金账号Cookie, 请自行获取, 对应掘金 sessinid（必填）",
+        ),
+        ("UUID", "掘金账号uuid（必填）"),
+        ("AID", "掘金账号aid（必填）"),
+        ("SEND_EMAIL", "是否发送邮件提醒更新cookie 0-否 1-是（可选）"),
+        ("CHECK_IN_CRON_STR", "自定义签到时间 cron 表达式（可选）"),
+        (
+            "SEND_EMAIL_CRON_STR",
+            "自定义发送邮件提醒时间 cron 表达式（可选）",
+        ),
+    ]);
+    for (field, description) in fields_description {
+        eprintln!("{}: {}", field, description);
+    }
+    eprintln!(
+        "\n cron 表达式说明(默认可以省略year):
+           sec   min   hour   day of month   month   day of week   year
+            *     *     *      *              *       *             *\n"
+    );
+}
+
+#[allow(dead_code)]
+fn get_check_in_cron_str() -> String {
+    dotenv::var("CHECK_IN_CRON_STR").unwrap_or(DEFAULT_CHECK_IN_CRON_STR.to_string())
+}
+
+#[allow(dead_code)]
+fn get_send_email_cron_str() -> String {
+    dotenv::var("SEND_EMAIL_CRON_STR").unwrap_or(DEFAULT_SEND_EMAIL_CRON_STR.to_string())
+}
+
+#[allow(dead_code)]
+fn get_send_email_flag() -> bool {
+    dotenv::var("SEND_EMAIL").unwrap_or("0".to_string()) == "1".to_string()
 }
 
 #[allow(dead_code)]
