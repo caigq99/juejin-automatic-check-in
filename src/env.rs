@@ -1,4 +1,7 @@
-use crate::config::{ENV_NOT_VALID_FIELDS, ENV_VALID_FIELDS};
+use crate::{
+    config::{ENV_IF_SEND_EMAIL, ENV_VALID_FIELDS},
+    email::check_send_email,
+};
 use anyhow::Result;
 use dotenv;
 use std::path::PathBuf;
@@ -14,31 +17,33 @@ pub fn load_env(env_path: &PathBuf) -> Result<()> {
 
 #[allow(dead_code)]
 pub fn valid_env() -> Result<()> {
+    // 验证必填字段
     for field in ENV_VALID_FIELDS {
         match dotenv::var(field) {
             Ok(value) => {
                 println!("{}: {}", field, value);
                 if value.trim().is_empty() {
                     return Err(anyhow::anyhow!("字段 {} 不能为空 ", field));
-                } else {
-                    if field == "SEND_EMAIL" && value == "1" {
-                        for field in ENV_NOT_VALID_FIELDS {
-                            match dotenv::var(field) {
-                                Ok(value) => {
-                                    if value.trim().is_empty() {
-                                        return Err(anyhow::anyhow!("字段 {} 不能为空 ", field));
-                                    }
-                                }
-                                Err(_) => {
-                                    return Err(anyhow::anyhow!("请添加 {} 字段 ", field));
-                                }
-                            }
-                        }
-                    }
                 }
             }
             Err(_) => {
                 return Err(anyhow::anyhow!("请添加 {} 字段 ", field));
+            }
+        }
+    }
+
+    if check_send_email() {
+        // 验证邮箱
+        for field in ENV_IF_SEND_EMAIL {
+            match dotenv::var(field) {
+                Ok(value) => {
+                    if value.trim().is_empty() {
+                        return Err(anyhow::anyhow!("字段 {} 不能为空 ", field));
+                    }
+                }
+                Err(_) => {
+                    return Err(anyhow::anyhow!("请添加 {} 字段 ", field));
+                }
             }
         }
     }
@@ -50,14 +55,6 @@ pub fn valid_env() -> Result<()> {
 pub fn env_file_exist(env_path: &PathBuf) -> bool {
     // 判断环境变量文件是否存在
     if !env_path.exists() {
-        // println!("以下字段为必须： ");
-        // for field in ENV_VALID_FIELDS {
-        //     println!("{}", field);
-        // }
-        // println!("以下字段非必须： （如果SEND_EMAIL为1, 则以下字段为必须）");
-        // for field in ENV_NOT_VALID_FIELDS {
-        //     println!("{}", field);
-        // }
         return false;
     }
     true

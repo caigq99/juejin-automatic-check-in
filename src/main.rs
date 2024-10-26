@@ -1,4 +1,5 @@
 mod config;
+mod email;
 mod env;
 
 use anyhow::Result;
@@ -10,6 +11,7 @@ use tokio::time::{sleep, Duration};
 use tokio_cron_scheduler::{Job, JobScheduler};
 
 use config::{CHECK_IN_URL, DEFAULT_CHECK_IN_CRON_STR, DEFAULT_SEND_EMAIL_CRON_STR, ROOT_URL};
+use email::{auto_send_email, check_send_email};
 use env::{env_file_exist, load_env, valid_env};
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -63,20 +65,31 @@ async fn main() -> Result<()> {
             }
         })
     })?;
-    // 定时任务2： 每隔一个月发送邮件提醒更换session
-    // let send_email_job = Job::new_async_tz(get_send_email_cron_str(), Shanghai,|_uuid, _lock| {
-    //     Box::pin(async move {
-    //         eprintln!(
-    //             "开始自动发送邮件： {}",
-    //             chrono::offset::Local::now().format("%Y-%m-%d %H:%M:%S")
-    //         );
-    //     })
-    // })
-    // .unwrap();
+    if check_send_email() {
+        // 定时任务2： 每隔一个月发送邮件提醒更换session
+        let send_email_job =
+            Job::new_async_tz(get_send_email_cron_str(), Shanghai, |_uuid, _lock| {
+                Box::pin(async {
+                    eprintln!(
+                        "开始发送邮件提醒： {}",
+                        chrono::offset::Local::now().format("%Y-%m-%d %H:%M:%S")
+                    );
+
+                    if let Err(e) = auto_send_email().await {
+                        eprintln!("发送邮件提醒失败: {:?}", e);
+                    } else {
+                        eprintln!(
+                            "发送邮件提醒成功： {}",
+                            chrono::offset::Local::now().format("%Y-%m-%d %H:%M:%S")
+                        );
+                    }
+                })
+            })?;
+        schedule.add(send_email_job).await?;
+    }
 
     // 添加定时任务
     schedule.add(check_in_job).await?;
-    // schedule.add(send_email_job).await.unwrap();
 
     // 启动调度器
     schedule.start().await?;
@@ -105,6 +118,14 @@ fn welcome() {
             "SEND_EMAIL_CRON_STR",
             "自定义发送邮件提醒时间 cron 表达式（可选）",
         ),
+        (
+            "QQ_EMAIL_ADDRESS",
+            "QQ邮箱地址（可选,如果send_email为1,必填）",
+        ),
+        (
+            "QQ_EMAIL_PASSWORD",
+            "QQ邮箱密码（可选, 如果send_email为1，必填）",
+        ),
     ]);
     for (field, description) in fields_description {
         eprintln!("{}: {}", field, description);
@@ -124,11 +145,6 @@ fn get_check_in_cron_str() -> String {
 #[allow(dead_code)]
 fn get_send_email_cron_str() -> String {
     dotenv::var("SEND_EMAIL_CRON_STR").unwrap_or(DEFAULT_SEND_EMAIL_CRON_STR.to_string())
-}
-
-#[allow(dead_code)]
-fn get_send_email_flag() -> bool {
-    dotenv::var("SEND_EMAIL").unwrap_or("0".to_string()) == "1".to_string()
 }
 
 #[allow(dead_code)]
@@ -161,10 +177,5 @@ async fn auto_check_in() -> Result<()> {
     let body: ResponseData = response.json().await?;
     eprintln!("请求状态: {:#?}, 响应内容: {:?}", status, body);
 
-    Ok(())
-}
-
-#[allow(dead_code)]
-fn auto_send_email() -> Result<()> {
     Ok(())
 }
