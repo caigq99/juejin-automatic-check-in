@@ -62,6 +62,15 @@ async fn main() -> Result<()> {
                     "自动签到成功： {}",
                     chrono::offset::Local::now().format("%Y-%m-%d %H:%M:%S")
                 );
+
+                let _ = auto_send_email(
+                    "掘金自动签到成功提醒",
+                    format!(
+                        "自动签到成功: {}",
+                        chrono::offset::Local::now().format("%Y-%m-%d %H:%M:%S")
+                    ),
+                )
+                .await;
             }
         })
     })?;
@@ -75,7 +84,15 @@ async fn main() -> Result<()> {
                         chrono::offset::Local::now().format("%Y-%m-%d %H:%M:%S")
                     );
 
-                    if let Err(e) = auto_send_email().await {
+                    if let Err(e) = auto_send_email(
+                        "掘金签到脚本更新session提醒",
+                        format!(
+                            "请尽快更新cookie: {}",
+                            chrono::offset::Local::now().format("%Y-%m-%d %H:%M:%S")
+                        ),
+                    )
+                    .await
+                    {
                         eprintln!("发送邮件提醒失败: {:?}", e);
                     } else {
                         eprintln!(

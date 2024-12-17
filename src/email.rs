@@ -1,8 +1,11 @@
 use anyhow::Result;
-use lettre::{message::MessageBuilder, SmtpTransport, Transport};
+use lettre::{
+    message::{IntoBody, MessageBuilder},
+    SmtpTransport, Transport,
+};
 
 #[allow(dead_code)]
-pub async fn auto_send_email() -> Result<()> {
+pub async fn auto_send_email(subject: impl Into<String>, body: impl IntoBody) -> Result<()> {
     //  STMP 服务配置
     let smtp_server = "smtp.qq.com";
     let stmp_port = 465;
@@ -13,11 +16,8 @@ pub async fn auto_send_email() -> Result<()> {
     let email = MessageBuilder::new()
         .from(qq_email_address.parse()?)
         .to(qq_email_address.parse()?)
-        .subject("掘金自动签到提醒")
-        .body(format!(
-            "请尽快更新cookie: {}",
-            chrono::offset::Local::now().format("%Y-%m-%d %H:%M:%S")
-        ))?;
+        .subject(subject)
+        .body(body)?;
 
     let transport = SmtpTransport::relay(smtp_server)?
         .credentials((qq_email_address, qq_email_password).into())
